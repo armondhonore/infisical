@@ -26,7 +26,11 @@ import {
   verifyProductMembership
 } from "../pam/pam-permission";
 import { TPamAccountDALFactory } from "../pam-account/pam-account-dal";
-import { extractGatewayTarget, parseInternalMetadata, validateConnectionDetails } from "../pam-account/pam-account-schemas";
+import {
+  extractGatewayTarget,
+  parseInternalMetadata,
+  validateConnectionDetails
+} from "../pam-account/pam-account-schemas";
 import {
   PamTemplateAccessPolicySchema,
   PamTemplateSettingsSchema
@@ -217,7 +221,10 @@ export const pamSessionServiceFactory = ({
       };
     }
 
-    const normalizedConnectionDetails = validateConnectionDetails(account.accountType as PamAccountType, connectionDetails);
+    const normalizedConnectionDetails = validateConnectionDetails(
+      account.accountType as PamAccountType,
+      connectionDetails
+    );
 
     if (sessionStarted) {
       await pamSessionDAL.activateSession(sessionId);
