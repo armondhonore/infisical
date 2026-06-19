@@ -34,7 +34,6 @@ import { Skeleton } from "@app/components/v3/generic/Skeleton";
 import { useProject } from "@app/context";
 import { AppConnection, useListAvailableAppConnections } from "@app/hooks/api/appConnections";
 import {
-  accountTypeRequiresRecording,
   PamAccountType,
   resolvePamAccountType,
   useGetPamAccountTemplate,
@@ -47,12 +46,11 @@ import { formatDetailDate, PamDetailSheet } from "../../components/PamDetailShee
 import { PAM_TEMPLATE_TABS } from "../../components/pamResourceTabs";
 import { SheetSaveBar } from "../../components/SheetSaveBar";
 import { AccountPlatformIcon } from "../../PamAccessPage/components/AccountPlatformIcon";
-import { RecordingConnectionPicker } from "../../PamAccountsPage/components/RecordingConnectionPicker";
+
 
 const configSchema = z.object({
   name: z.string().min(1, "Name is required").max(64),
   description: z.string().max(256).optional(),
-  recordingEnabled: z.boolean(),
   recordingStorageBackend: z.enum(["postgres", "aws-s3"]),
   recordingConnectionId: z.string().nullable(),
   s3Bucket: z.string().optional(),
@@ -73,8 +71,7 @@ const settingsSchema = z.object({
     .optional()
     .nullable(),
   gatewayId: z.string().nullable(),
-  gatewayPoolId: z.string().nullable(),
-  recordingConnectionId: z.string().nullable()
+  gatewayPoolId: z.string().nullable()
 });
 
 type SettingsForm = z.infer<typeof settingsSchema>;
@@ -114,7 +111,7 @@ const ConfigurationTab = ({
     defaultValues: {
       name: "",
       description: "",
-      recordingEnabled: true,
+
       recordingStorageBackend: "postgres",
       recordingConnectionId: null,
       s3Bucket: "",
@@ -139,7 +136,7 @@ const ConfigurationTab = ({
       reset({
         name: template.name,
         description: template.description ?? "",
-        recordingEnabled: settings.recordingEnabled !== false,
+
         recordingStorageBackend: isWin ? "aws-s3" : (savedBackend ?? "postgres"),
         recordingConnectionId: (template.recordingConnectionId as string) ?? null,
         s3Bucket: s3Config.bucket ?? "",
@@ -152,7 +149,7 @@ const ConfigurationTab = ({
   const onSubmit = (data: ConfigForm) => {
     const settings: Record<string, unknown> = {
       ...((template?.settings ?? {}) as Record<string, unknown>),
-      recordingEnabled: data.recordingEnabled,
+
       recordingStorageBackend: data.recordingStorageBackend
     };
 
@@ -187,7 +184,12 @@ const ConfigurationTab = ({
                 {
                   title: "Bucket CORS not configured",
                   type: "warning",
-                  text: "Session playback requires the bucket to allow GET requests from this origin. See the docs for CORS setup."
+                  text: "Session playback requires the bucket to allow GET requests from this origin.",
+                  callToAction: (
+                    <a href="https://infisical.com/docs/documentation/platform/pam/recording-storage" target="_blank" rel="noopener noreferrer" className="text-xs underline">
+                      CORS setup docs
+                    </a>
+                  )
                 },
                 { autoClose: 10000 }
               );
@@ -253,20 +255,6 @@ const ConfigurationTab = ({
           <CardDescription>Configure how sessions are recorded and stored.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          <Field orientation="horizontal" className="items-center!">
-            <FieldContent>
-              <FieldTitle>Enable recording</FieldTitle>
-              <FieldDescription>Record session activity for audit and playback.</FieldDescription>
-            </FieldContent>
-            <Controller
-              name="recordingEnabled"
-              control={control}
-              render={({ field }) => (
-                <Switch checked={field.value} variant="pam" onCheckedChange={field.onChange} />
-              )}
-            />
-          </Field>
-
           <Controller
             name="recordingStorageBackend"
             control={control}
@@ -279,14 +267,14 @@ const ConfigurationTab = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {!isWindows && <SelectItem value="postgres">PostgreSQL (default)</SelectItem>}
+                      {!isWindows && <SelectItem value="postgres">Internal Database (default)</SelectItem>}
                       <SelectItem value="aws-s3">AWS S3</SelectItem>
                     </SelectContent>
                   </Select>
                   <FieldDescription>
                     {isWindows
                       ? "RDP recordings require S3 storage."
-                      : "PostgreSQL stores recordings in the database. S3 is recommended for large or long sessions."}
+                      : "Stores recordings in the database. S3 is recommended for large or long sessions."}
                   </FieldDescription>
                 </FieldContent>
               </Field>
@@ -410,8 +398,7 @@ const SettingsTab = ({
       requireMfa: false,
       maxSessionDurationSeconds: null,
       gatewayId: null,
-      gatewayPoolId: null,
-      recordingConnectionId: null
+      gatewayPoolId: null
     }
   });
 
@@ -431,8 +418,7 @@ const SettingsTab = ({
             ? policy.maxSessionDurationSeconds
             : null,
         gatewayId: template.gatewayId ?? null,
-        gatewayPoolId: template.gatewayPoolId ?? null,
-        recordingConnectionId: template.recordingConnectionId ?? null
+        gatewayPoolId: template.gatewayPoolId ?? null
       });
     }
   }, [template, reset]);
@@ -451,8 +437,6 @@ const SettingsTab = ({
 
   const gatewayId = watch("gatewayId");
   const gatewayPoolId = watch("gatewayPoolId");
-  const recordingConnectionId = watch("recordingConnectionId");
-  const showRecording = accountTypeRequiresRecording(template.type);
 
   const onSubmit = (data: SettingsForm) => {
     updateTemplate.mutate(
@@ -464,8 +448,7 @@ const SettingsTab = ({
           maxSessionDurationSeconds: data.maxSessionDurationSeconds ?? undefined
         },
         gatewayId: data.gatewayId,
-        gatewayPoolId: data.gatewayPoolId,
-        ...(showRecording ? { recordingConnectionId: data.recordingConnectionId } : {})
+        gatewayPoolId: data.gatewayPoolId
       },
       {
         onSuccess: () => createNotification({ type: "success", text: "Template updated" })
@@ -559,21 +542,7 @@ const SettingsTab = ({
             </FieldContent>
           </Field>
 
-          {showRecording && (
-            <Field>
-              <FieldLabel>Recording Bucket</FieldLabel>
-              <FieldContent>
-                <RecordingConnectionPicker
-                  value={recordingConnectionId}
-                  includeNone
-                  onChange={(value) =>
-                    setValue("recordingConnectionId", value, { shouldDirty: true })
-                  }
-                />
-                <FieldDescription>Where session recordings are stored.</FieldDescription>
-              </FieldContent>
-            </Field>
-          )}
+
         </CardContent>
       </Card>
 
