@@ -2,9 +2,10 @@ import { TPermissionServiceFactory } from "@app/ee/services/permission/permissio
 import { DatabaseErrorCode } from "@app/lib/error-codes";
 import { BadRequestError, DatabaseError, ForbiddenRequestError, NotFoundError } from "@app/lib/errors";
 
-import { PamProductRole } from "../pam/pam-enums";
+import { PamAccountType, PamProductRole, resolveAccountType } from "../pam/pam-enums";
 import { TActorContext, verifyProductMembership } from "../pam/pam-permission";
-import { TPamValidatorDeps, validateGatewayAttachment, validateRecordingConnection } from "../pam/pam-validators";
+import { mintCorsProbeUrl, TPamValidatorDeps, validateGatewayAttachment, validateRecordingConnection, validateRecordingS3Config } from "../pam/pam-validators";
+import { PamRecordingS3ConfigSchema } from "./pam-account-template-schemas";
 import { ACCOUNT_TYPE_CONFIGS } from "../pam-account/pam-account-schemas";
 import { TPamAccountTemplateDALFactory } from "./pam-account-template-dal";
 import {
@@ -71,8 +72,18 @@ export const pamAccountTemplateServiceFactory = (deps: TPamAccountTemplateServic
     await validateGatewayAttachment(deps, gatewayId, gatewayPoolId, ctx);
     await validateRecordingConnection(deps, recordingConnectionId, ctx);
 
+    let resolvedS3Config = null;
+    if (recordingConnectionId && settings) {
+      const s3Parsed = PamRecordingS3ConfigSchema.safeParse(
+        (settings as Record<string, unknown>).recordingS3Config
+      );
+      if (s3Parsed.success) {
+        resolvedS3Config = await validateRecordingS3Config(deps, recordingConnectionId, s3Parsed.data);
+      }
+    }
+
     try {
-      return await pamAccountTemplateDAL.create({
+      const template = await pamAccountTemplateDAL.create({
         projectId,
         name,
         description,
@@ -83,6 +94,8 @@ export const pamAccountTemplateServiceFactory = (deps: TPamAccountTemplateServic
         gatewayPoolId,
         recordingConnectionId
       });
+      const corsProbeUrl = resolvedS3Config ? await mintCorsProbeUrl(resolvedS3Config) : null;
+      return { ...template, corsProbeUrl };
     } catch (err) {
       if (
         err instanceof DatabaseError &&
@@ -115,6 +128,18 @@ export const pamAccountTemplateServiceFactory = (deps: TPamAccountTemplateServic
       throw new NotFoundError({ message: `Account template with ID '${templateId}' not found` });
     }
 
+    const resolvedConnId = recordingConnectionId !== undefined ? recordingConnectionId : existing.recordingConnectionId;
+    const resolvedSettings = settings !== undefined ? settings : existing.settings;
+    let resolvedS3Config = null;
+    if (resolvedConnId && resolvedSettings) {
+      const s3Parsed = PamRecordingS3ConfigSchema.safeParse(
+        (resolvedSettings as Record<string, unknown>).recordingS3Config
+      );
+      if (s3Parsed.success) {
+        resolvedS3Config = await validateRecordingS3Config(deps, resolvedConnId, s3Parsed.data);
+      }
+    }
+
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
@@ -125,7 +150,9 @@ export const pamAccountTemplateServiceFactory = (deps: TPamAccountTemplateServic
     if (recordingConnectionId !== undefined) updateData.recordingConnectionId = recordingConnectionId;
 
     try {
-      return await pamAccountTemplateDAL.updateById(templateId, updateData);
+      const template = await pamAccountTemplateDAL.updateById(templateId, updateData);
+      const corsProbeUrl = resolvedS3Config ? await mintCorsProbeUrl(resolvedS3Config) : null;
+      return { ...template, corsProbeUrl };
     } catch (err) {
       if (
         err instanceof DatabaseError &&

@@ -10,6 +10,7 @@ import {
   PamAccountTypeMetadataSchema
 } from "@app/ee/services/pam-account/pam-account-schemas";
 import {
+  PamAccountRecordingSettingsSchema,
   PamTemplateAccessPolicySchema,
   PamTemplateSettingsSchema
 } from "@app/ee/services/pam-account-template/pam-account-template-schemas";
@@ -36,6 +37,7 @@ const BaseAccountFields = PamAccountsSchema.pick({
   gatewayId: true,
   gatewayPoolId: true,
   recordingConnectionId: true,
+  recordingSettings: true,
   createdAt: true,
   updatedAt: true
 });
@@ -102,7 +104,8 @@ const registerPerTypeEndpoints = (
         credentials: config.credentials,
         gatewayId: z.string().uuid().optional().describe("The ID of the gateway to use"),
         gatewayPoolId: z.string().uuid().optional().describe("The ID of the gateway pool to use"),
-        recordingConnectionId: z.string().uuid().optional().describe("The ID of the recording connection to use")
+        recordingConnectionId: z.string().uuid().optional().describe("The ID of the recording connection to use"),
+        recordingSettings: PamAccountRecordingSettingsSchema.nullable().optional().describe("Account-level recording S3 config override")
       }),
       response: {
         200: z.object({
@@ -111,14 +114,15 @@ const registerPerTypeEndpoints = (
             folderName: z.string(),
             templateName: z.string(),
             connectionDetails: z.record(z.unknown())
-          })
+          }),
+          corsProbeUrl: z.string().nullable().optional()
         })
       }
     },
     config: { rateLimit: writeLimit },
     onRequest: verifyAuth([AuthMode.JWT]),
     handler: async (req) => {
-      const account = await server.services.pamAccount.create({
+      const { corsProbeUrl, ...account } = await server.services.pamAccount.create({
         accountType,
         ...req.body,
         projectId: req.internalPamProjectId,
@@ -157,7 +161,7 @@ const registerPerTypeEndpoints = (
         })
         .catch(() => {});
 
-      return { account };
+      return { account, corsProbeUrl };
     }
   });
 
@@ -183,16 +187,20 @@ const registerPerTypeEndpoints = (
           .uuid()
           .nullable()
           .optional()
-          .describe("The ID of the recording connection to use")
+          .describe("The ID of the recording connection to use"),
+        recordingSettings: PamAccountRecordingSettingsSchema.nullable().optional().describe("Account-level recording S3 config override")
       }),
       response: {
-        200: z.object({ account: BaseAccountFields })
+        200: z.object({
+          account: BaseAccountFields,
+          corsProbeUrl: z.string().nullable().optional()
+        })
       }
     },
     config: { rateLimit: writeLimit },
     onRequest: verifyAuth([AuthMode.JWT]),
     handler: async (req) => {
-      const account = await server.services.pamAccount.update({
+      const { corsProbeUrl, ...account } = await server.services.pamAccount.update({
         accountId: req.params.accountId,
         accountType,
         ...req.body,
@@ -236,7 +244,7 @@ const registerPerTypeEndpoints = (
         })
         .catch(() => {});
 
-      return { account };
+      return { account, corsProbeUrl };
     }
   });
 
