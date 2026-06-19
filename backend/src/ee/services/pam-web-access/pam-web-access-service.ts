@@ -5,7 +5,7 @@ import type WebSocket from "ws";
 import { AuditLogInfo, EventType, TAuditLogServiceFactory } from "@app/ee/services/audit-log/audit-log-types";
 import { TGatewayPoolServiceFactory } from "@app/ee/services/gateway-pool/gateway-pool-service";
 import { TGatewayV2ServiceFactory } from "@app/ee/services/gateway-v2/gateway-v2-service";
-import { PamAccountType } from "@app/ee/services/pam/pam-enums";
+import { PamAccountType, resolveAccountType } from "@app/ee/services/pam/pam-enums";
 import { PamTemplateAccessPolicySchema } from "@app/ee/services/pam-account-template/pam-account-template-schemas";
 import { TPermissionServiceFactory } from "@app/ee/services/permission/permission-service-types";
 import { ResourcePermissionPamResourceActions } from "@app/ee/services/permission/resource-permission";
@@ -133,7 +133,7 @@ export const pamWebAccessServiceFactory = ({
       throw new NotFoundError({ message: `Account with ID '${accountId}' not found` });
     }
 
-    if (!SESSION_HANDLERS[account.accountType as PamAccountType]) {
+    if (!SESSION_HANDLERS[resolveAccountType(account.accountType)]) {
       throw new BadRequestError({ message: "Web access is not supported for this account type" });
     }
 
@@ -338,7 +338,7 @@ export const pamWebAccessServiceFactory = ({
         throw new BadRequestError({ message: "Invalid account or project" });
       }
 
-      const handlerEntry = SESSION_HANDLERS[account.accountType as PamAccountType];
+      const handlerEntry = SESSION_HANDLERS[resolveAccountType(account.accountType)];
       if (!handlerEntry) {
         throw new BadRequestError({ message: "Web access is not supported for this account type" });
       }
@@ -413,8 +413,10 @@ export const pamWebAccessServiceFactory = ({
         gateway: certs.gateway
       };
 
+      const isRdp = resolveAccountType(account.accountType) === PamAccountType.Windows;
+
       relayServer = await setupRelayServer({
-        protocol: GatewayProxyProtocol.Pam,
+        protocol: isRdp ? GatewayProxyProtocol.PamRdpBrowser : GatewayProxyProtocol.Pam,
         relayHost: certs.relayHost,
         relay: certs.relay,
         gateway: certs.gateway,
@@ -452,7 +454,11 @@ export const pamWebAccessServiceFactory = ({
         releaseEarlyBuffer();
       }
 
-      await pamSessionDAL.activateSession(session.id);
+      // RDP sessions are activated by the gateway after credential exchange,
+      // not by the web access service.
+      if (!isRdp) {
+        await pamSessionDAL.activateSession(session.id);
+      }
 
       logger.info({ accountId, sessionId: session.id }, "Web access session established");
 

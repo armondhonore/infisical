@@ -18,7 +18,7 @@ import { TMembershipDALFactory } from "@app/services/membership/membership-dal";
 import { TMembershipRoleDALFactory } from "@app/services/membership/membership-role-dal";
 import { TUserDALFactory } from "@app/services/user/user-dal";
 
-import { PamAccessMethod, PamAccountType, PamSessionStatus } from "../pam/pam-enums";
+import { PamAccessMethod, PamAccountType, PamSessionStatus, resolveAccountType } from "../pam/pam-enums";
 import {
   checkAccountAccess,
   getResourceIdsWithActions,
@@ -26,8 +26,11 @@ import {
   verifyProductMembership
 } from "../pam/pam-permission";
 import { TPamAccountDALFactory } from "../pam-account/pam-account-dal";
-import { extractGatewayTarget, parseInternalMetadata } from "../pam-account/pam-account-schemas";
-import { PamTemplateAccessPolicySchema } from "../pam-account-template/pam-account-template-schemas";
+import { extractGatewayTarget, parseInternalMetadata, validateConnectionDetails } from "../pam-account/pam-account-schemas";
+import {
+  PamTemplateAccessPolicySchema,
+  PamTemplateSettingsSchema
+} from "../pam-account-template/pam-account-template-schemas";
 import { TPamFolderDALFactory } from "../pam-folder/pam-folder-dal";
 import { PamRecordingStorageBackend } from "../pam-session-recording/pam-recording-enums";
 import { generateSessionRecordingSecrets } from "../pam-session-recording/pam-recording-secrets";
@@ -196,17 +199,32 @@ export const pamSessionServiceFactory = ({
         gatewayUploadTokenHash: secrets.uploadTokenHash
       });
 
+      const templateSettingsParsed = account.templateSettings
+        ? PamTemplateSettingsSchema.safeParse(account.templateSettings)
+        : null;
+      const resolvedBackend =
+        templateSettingsParsed?.success && templateSettingsParsed.data.recordingStorageBackend
+          ? templateSettingsParsed.data.recordingStorageBackend
+          : PamRecordingStorageBackend.Postgres;
+
       recording = {
         sessionKey: secrets.sessionKey.toString("base64"),
         uploadToken: secrets.uploadToken.toString("base64"),
-        storageBackend: PamRecordingStorageBackend.Postgres,
+        storageBackend: resolvedBackend,
         projectId: session.projectId,
         sessionId
       };
     }
 
+    const resolved = resolveAccountType(account.accountType);
+    const normalizedConnectionDetails = validateConnectionDetails(resolved, connectionDetails);
+
+    if (sessionStarted) {
+      await pamSessionDAL.activateSession(sessionId);
+    }
+
     return {
-      credentials: { ...connectionDetails, ...credentials },
+      credentials: { ...normalizedConnectionDetails, ...credentials },
       recording,
       projectId: session.projectId,
       accountId: session.accountId,

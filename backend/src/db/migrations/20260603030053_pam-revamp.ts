@@ -188,6 +188,9 @@ export async function up(knex: Knex): Promise<void> {
     for (const t of templates) {
       templateMap[t.type] = t.id;
     }
+    if (templateMap.windows && !templateMap["active-directory"]) {
+      templateMap["active-directory"] = templateMap.windows;
+    }
 
     const oldPamProjects = await knex(TableName.Project)
       .where({ orgId, type: ProjectType.PAM })

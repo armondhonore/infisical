@@ -2,7 +2,7 @@
 import RE2 from "re2";
 import { z } from "zod";
 
-import { PamAccountType } from "../pam/pam-enums";
+import { PamAccountType, resolveAccountType } from "../pam/pam-enums";
 
 enum PamFieldWidget {
   Text = "text",
@@ -141,6 +141,32 @@ export const ACCOUNT_TYPE_CONFIGS = {
       caPublicKey: z.string(),
       caKeyAlgorithm: z.string()
     })
+  },
+
+  [PamAccountType.Windows]: {
+    name: "Windows",
+    icon: "Windows.png",
+    connectionDetails: z.object({
+      host: z.string().trim().min(1).max(255),
+      port: z.coerce.number().int().min(1).max(65535)
+    }),
+    credentials: z.object({
+      username: z.string().trim().min(1).max(255),
+      password: z
+        .string()
+        .trim()
+        .max(255)
+        .transform((v) => v || undefined)
+        .optional(),
+      domain: z.string().trim().max(255).optional()
+    }),
+    sanitizedCredentials: z.object({
+      username: z.string().optional(),
+      domain: z.string().optional()
+    }),
+    ui: {
+      password: { widget: PamFieldWidget.Password, secret: true }
+    }
   }
 } as const satisfies Partial<
   Record<
@@ -168,8 +194,9 @@ export const ACCOUNT_TYPE_CONFIGS = {
 
 type TSupportedAccountType = keyof typeof ACCOUNT_TYPE_CONFIGS;
 
-const getAccountTypeConfig = (accountType: PamAccountType) => {
-  const config = ACCOUNT_TYPE_CONFIGS[accountType as TSupportedAccountType];
+const getAccountTypeConfig = (accountType: PamAccountType | string) => {
+  const resolved = resolveAccountType(accountType);
+  const config = ACCOUNT_TYPE_CONFIGS[resolved as TSupportedAccountType];
   if (!config) {
     throw new Error(`Account type '${accountType}' is not supported in this phase`);
   }
@@ -177,6 +204,13 @@ const getAccountTypeConfig = (accountType: PamAccountType) => {
 };
 
 export const validateConnectionDetails = (accountType: PamAccountType, data: unknown) => {
+  const resolved = resolveAccountType(accountType);
+  if (resolved === PamAccountType.Windows && data && typeof data === "object") {
+    const raw = data as Record<string, unknown>;
+    if (!raw.host && raw.hostname) {
+      raw.host = raw.hostname;
+    }
+  }
   return getAccountTypeConfig(accountType).connectionDetails.parse(data) as z.output<
     (typeof ACCOUNT_TYPE_CONFIGS)[TSupportedAccountType]["connectionDetails"]
   >;
@@ -197,15 +231,17 @@ export const sanitizeCredentials = (accountType: PamAccountType, data: unknown) 
 export type TGatewayTarget = { host: string; port?: number };
 
 export const extractGatewayTarget = (
-  accountType: PamAccountType,
+  accountType: PamAccountType | string,
   rawConnectionDetails: Record<string, unknown>
 ): TGatewayTarget => {
-  const validated = validateConnectionDetails(accountType, rawConnectionDetails);
+  const resolved = resolveAccountType(accountType);
+  const validated = validateConnectionDetails(resolved, rawConnectionDetails);
 
-  switch (accountType) {
+  switch (resolved) {
     case PamAccountType.SSH:
     case PamAccountType.Postgres:
     case PamAccountType.MySQL:
+    case PamAccountType.Windows:
       return {
         host: (validated as { host: string; port: number }).host,
         port: (validated as { host: string; port: number }).port
