@@ -39,7 +39,7 @@ export const ACCOUNT_TYPE_CONFIGS = {
         .transform((v) => v || undefined)
         .optional()
     }),
-    sanitizedCredentials: z.object({ username: z.string().optional() }),
+    sanitizedCredentials: z.object({ username: z.string() }),
     ui: {
       port: { defaultValue: 5432 },
       sslEnabled: { label: "SSL Enabled" },
@@ -80,7 +80,7 @@ export const ACCOUNT_TYPE_CONFIGS = {
         .transform((v) => v || undefined)
         .optional()
     }),
-    sanitizedCredentials: z.object({ username: z.string().optional() }),
+    sanitizedCredentials: z.object({ username: z.string() }),
     ui: {
       port: { defaultValue: 3306 },
       sslEnabled: { label: "SSL Enabled" },
@@ -127,8 +127,8 @@ export const ACCOUNT_TYPE_CONFIGS = {
       z.object({ authMethod: z.literal("certificate"), username: z.string().trim().min(1) })
     ]),
     sanitizedCredentials: z.object({
-      authMethod: z.string().optional(),
-      username: z.string().optional()
+      authMethod: z.string(),
+      username: z.string()
     }),
     ui: {
       port: { defaultValue: 22 },
@@ -161,7 +161,7 @@ export const ACCOUNT_TYPE_CONFIGS = {
       domain: z.string().trim().max(255).optional()
     }),
     sanitizedCredentials: z.object({
-      username: z.string().optional(),
+      username: z.string(),
       domain: z.string().optional()
     }),
     ui: {
