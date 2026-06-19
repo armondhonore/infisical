@@ -35,7 +35,6 @@ import { useProject } from "@app/context";
 import { AppConnection, useListAvailableAppConnections } from "@app/hooks/api/appConnections";
 import {
   PamAccountType,
-  resolvePamAccountType,
   useGetPamAccountTemplate,
   usePamAccountTypeMap,
   useUpdatePamAccountTemplate
@@ -98,7 +97,7 @@ const ConfigurationTab = ({
   );
 
   const isWindows =
-    template?.type && resolvePamAccountType(template.type) === PamAccountType.Windows;
+    template?.type && template.type === PamAccountType.Windows;
 
   const {
     control,
@@ -131,7 +130,7 @@ const ConfigurationTab = ({
     if (template) {
       const settings = (template.settings ?? {}) as Record<string, unknown>;
       const s3Config = (settings.recordingS3Config ?? {}) as Record<string, string>;
-      const isWin = resolvePamAccountType(template.type) === PamAccountType.Windows;
+      const isWin = template.type === PamAccountType.Windows;
       const savedBackend = settings.recordingStorageBackend as "postgres" | "aws-s3" | undefined;
       reset({
         name: template.name,

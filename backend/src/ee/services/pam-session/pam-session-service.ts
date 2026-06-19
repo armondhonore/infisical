@@ -18,7 +18,7 @@ import { TMembershipDALFactory } from "@app/services/membership/membership-dal";
 import { TMembershipRoleDALFactory } from "@app/services/membership/membership-role-dal";
 import { TUserDALFactory } from "@app/services/user/user-dal";
 
-import { PamAccessMethod, PamAccountType, PamSessionStatus, resolveAccountType } from "../pam/pam-enums";
+import { PamAccessMethod, PamAccountType, PamSessionStatus } from "../pam/pam-enums";
 import {
   checkAccountAccess,
   getResourceIdsWithActions,
@@ -216,8 +216,7 @@ export const pamSessionServiceFactory = ({
       };
     }
 
-    const resolved = resolveAccountType(account.accountType);
-    const normalizedConnectionDetails = validateConnectionDetails(resolved, connectionDetails);
+    const normalizedConnectionDetails = validateConnectionDetails(account.accountType as PamAccountType, connectionDetails);
 
     if (sessionStarted) {
       await pamSessionDAL.activateSession(sessionId);

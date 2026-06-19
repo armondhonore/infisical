@@ -2,7 +2,7 @@ import { TPermissionServiceFactory } from "@app/ee/services/permission/permissio
 import { DatabaseErrorCode } from "@app/lib/error-codes";
 import { BadRequestError, DatabaseError, ForbiddenRequestError, NotFoundError } from "@app/lib/errors";
 
-import { PamAccountType, PamProductRole, resolveAccountType } from "../pam/pam-enums";
+import { PamProductRole } from "../pam/pam-enums";
 import { TActorContext, verifyProductMembership } from "../pam/pam-permission";
 import { mintCorsProbeUrl, TPamValidatorDeps, validateGatewayAttachment, validateRecordingConnection, validateRecordingS3Config } from "../pam/pam-validators";
 import { PamRecordingS3ConfigSchema } from "./pam-account-template-schemas";
