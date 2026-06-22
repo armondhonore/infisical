@@ -1,0 +1,39 @@
+application:
+  name: infisical
+  pods:
+  - name: app
+    image: infisical/infisical:latest-postgres
+    path: /
+    servicePorts:
+    - 8080
+    vars:
+      DATABASE_URL: "postgresql://infisical:infisical@postgres.pod:5432/infisical"
+      REDIS_URL: "redis://redis.pod:6379"
+      ENCRYPTION_KEY: "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+      AUTH_SECRET: "e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6"
+      SITE_URL: "https://relaxed-weasel-infisical.cloud.nexlayer.ai"
+      TELEMETRY_ENABLED: "false"
+    volumes:
+    - name: infisical-data
+      mountPath: /app/data
+      size: 5Gi
+  - name: postgres
+    image: postgres:16-alpine
+    servicePorts:
+    - 5432
+    vars:
+      POSTGRES_DB: infisical
+      POSTGRES_USER: infisical
+      POSTGRES_PASSWORD: infisical
+    volumes:
+    - name: infisical-db
+      mountPath: /var/lib/postgresql/data
+      size: 5Gi
+  - name: redis
+    image: redis:7-alpine
+    servicePorts:
+    - 6379
+    volumes:
+    - name: infisical-redis
+      mountPath: /data
+      size: 2Gi
