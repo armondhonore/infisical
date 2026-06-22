@@ -88,7 +88,7 @@ export const pamAccountTemplateServiceFactory = (deps: TPamAccountTemplateServic
     if (recordingConnectionId && settings) {
       const s3Parsed = PamRecordingS3ConfigSchema.safeParse((settings as Record<string, unknown>).recordingS3Config);
       if (s3Parsed.success) {
-        resolvedS3Config = await validateRecordingS3Config(deps, recordingConnectionId, s3Parsed.data);
+        resolvedS3Config = await validateRecordingS3Config(deps, recordingConnectionId, s3Parsed.data, ctx);
       }
     }
 
@@ -157,7 +157,7 @@ export const pamAccountTemplateServiceFactory = (deps: TPamAccountTemplateServic
         (resolvedSettings as Record<string, unknown>).recordingS3Config
       );
       if (s3Parsed.success) {
-        resolvedS3Config = await validateRecordingS3Config(deps, resolvedConnId, s3Parsed.data);
+        resolvedS3Config = await validateRecordingS3Config(deps, resolvedConnId, s3Parsed.data, ctx);
       }
     }
 
